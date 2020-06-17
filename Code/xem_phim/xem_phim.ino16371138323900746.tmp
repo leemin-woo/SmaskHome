@@ -1,0 +1,202 @@
+/*
+  Web:
+   - Đèn chiêu sáng: 0,1
+   - Điều hòa: 2,3
+   - Rèm: 4,5
+ */
+
+#include <Servo.h>
+
+#define CBHN A0
+#define CBND A1
+#define button_bat_auto 2// công tắc bật chế độ xem phim
+#define button_tat_auto 3//cong tac tat che do xem phim
+#define button_den 4// cong tac bật đèn chiếu sáng
+#define button_tivi 5// cong tac bật tivi
+#define button_rem 6// công tắc kéo rèm
+#define button_dieuhoa 7// cong tac bat tat dieu hoa
+#define led_cauthang 8
+#define led 9//den chieu sang
+#define tivi 10//den tivi
+#define fan 11 // dieu hoa
+#define pinServo 12
+
+float nhiet_do;
+boolean state_led = 0,state_tivi = 0,state_fan = 0;
+int pos = 180, data_send = 0, data_receive = 0;
+// pos = 180 la rem dong
+Servo rem;
+
+void setup()
+{
+  pinMode(CBHN, INPUT);
+  pinMode(CBND, INPUT);
+  
+  pinMode(button_den, INPUT_PULLUP);
+  pinMode(button_tivi, INPUT_PULLUP);
+  pinMode(button_dieuhoa, INPUT_PULLUP);
+  pinMode(button_rem, INPUT_PULLUP);
+  pinMode(button_bat_auto, INPUT_PULLUP);
+  pinMode(button_tat_auto, INPUT_PULLUP);
+
+  pinMode(led_cauthang, OUTPUT);
+  pinMode(led, OUTPUT);
+  pinMode(tivi, OUTPUT);
+  pinMode(fan,OUTPUT);
+  
+  digitalWrite(led, HIGH); // relay BAT o muc thap, TAT o muc cao
+  digitalWrite(fan,HIGH);
+  digitalWrite(tivi, LOW);
+  digitalWrite(led_cauthang, LOW);
+  
+  rem.attach(pinServo);
+  rem.write(pos);
+  Serial.begin(9600);
+}
+
+void loop() {
+  
+  //den cau thang
+       if(digitalRead(CBHN)==0) digitalWrite(led_cauthang, HIGH);
+       else digitalWrite(led_cauthang, LOW);
+  //-------------------------
+ // bat den chieu sang
+            if(digitalRead(button_den)==0)
+            { 
+              while (digitalRead(button_den)==0);
+              state_led=!state_led;
+              if(state_led == 1) { // bat den
+                digitalWrite(led, 0);
+                data_send = 1;
+                Serial.write(data_send/256);
+                Serial.write(data_send%256);  
+              }
+              else { // tat den
+                digitalWrite(led, 1);
+                data_send = 0;
+                Serial.write(data_send/256);
+                Serial.write(data_send%256);                  
+              }
+            }
+            
+  //----------------------------------
+ // bat tivi
+            if(digitalRead(button_tivi)==0)
+            {
+              while (digitalRead(button_tivi)==0);
+              state_tivi = !state_tivi;
+              digitalWrite(tivi, state_tivi);
+            }
+   //-------------------------
+ // bat dieu hoa
+          if(digitalRead(button_dieuhoa)==0)
+          { 
+            while (digitalRead(button_dieuhoa)==0);
+            state_fan=!state_fan;  
+            if(state_fan == 1) { // bat dieu hoa
+              digitalWrite(fan, 0);
+              data_send = 3;
+              Serial.write(data_send/256);
+              Serial.write(data_send%256);  
+            }
+            else { // tat dieu hoa
+              digitalWrite(fan, 1);
+              data_send = 2;
+              Serial.write(data_send/256);
+              Serial.write(data_send%256);                  
+            }              
+          }
+                     
+  //----------------------------------
+  //kéo rèm 
+        if((digitalRead(button_rem)==0))
+        { 
+          while (digitalRead(button_rem)==0);
+          if(pos == 0) {
+           for(pos = 0; pos < 180; pos += 1)  // cho servo quay từ 0->179 độ
+              {                                  // mỗi bước của vòng lặp tăng 1 độ
+                rem.write(pos);              // xuất tọa độ ra cho servo
+                delay(20);                       // đợi 15 ms cho servo quay đến góc đó rồi tới bước tiếp theo
+              } 
+          }
+           else {
+            for(pos = 180; pos>=1; pos-=1)     // cho servo quay từ 179-->0 độ
+              {                                
+                 rem.write(pos);              // xuất tọa độ ra cho servo
+                 delay(20);                       // đợi 15 ms cho servo quay đến góc đó rồi tới bước tiếp theo
+              } 
+          }
+        }
+            
+  //----------------------------------
+  // bật chế dọ xem phim: tat den, bat tivi, keo rem, bat dieu hoa
+       if(digitalRead(button_bat_auto)==0)
+       {   
+           while (digitalRead(button_bat_auto)==0);
+           // tat den, bat tivi, keo rem, bat dieu hoa
+           digitalWrite(tivi,HIGH); // bat tivi
+           state_tivi = 1;
+           
+           digitalWrite(led, HIGH); // tat den
+           state_led = 0;
+           data_send = 0;
+           Serial.write(data_send/256);
+           Serial.write(data_send%256);
+           delay(60);
+           
+           digitalWrite(fan, LOW); // bat dieu hoa
+           state_fan = 1;
+           data_send = 3;
+           Serial.write(data_send/256);
+           Serial.write(data_send%256);
+           delay(60);   
+                   
+           if( pos == 0 )
+            { 
+               for(pos = 0; pos < 180; pos += 1) 
+                {                                  
+                  rem.write(pos);              
+                  delay(20);                       
+                }
+            }
+            
+       }
+        if(digitalRead(button_tat_auto)==0) // tat che do xem phim: bat den, tat tivi, tat dieu hoa, mo rem
+        {  while ((digitalRead(button_tat_auto)==0));
+
+           digitalWrite(tivi,LOW);
+           state_tivi = 0;
+                  
+           digitalWrite(led, LOW); // bat den
+           state_led = 1;
+           data_send = 1;
+           Serial.write(data_send/256);
+           Serial.write(data_send%256);
+           delay(60);
+           
+           digitalWrite(fan, HIGH); // tat dieu hoa
+           state_fan = 0;
+           data_send = 2;
+           Serial.write(data_send/256);
+           Serial.write(data_send%256);
+           delay(60); 
+           
+          if(pos==180)
+                { 
+                   for(pos = 180; pos>=1; pos-=1)    
+                {                                
+                   rem.write(pos);             
+                   delay(20);                       
+                } 
+               }
+        }
+         
+       
+//---------------------------
+//nhiet do
+    nhiet_do = 5.0*100.0*analogRead(CBND)/1024.0;
+    //Serial.println(nhiet_do);
+    delay(100);
+   //----------------------------------
+}
+

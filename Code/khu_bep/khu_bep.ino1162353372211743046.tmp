@@ -1,0 +1,173 @@
+/*
+  Chức năng:
+   - Đèn + quạt.
+   - Cảm biến khí gas, khói.
+   - Cảm biến nhiệt độ.
+   - Còi báo.
+   - Servo(dây phơi) + cảm biến mưa.
+  Web:
+   - Đèn: 0,1
+   - Quạt: 2,3
+*/
+
+
+#include <Servo.h>
+
+#define CBGAS A0
+#define CBND A1
+#define CBMUA 9
+#define led_bep 3
+#define fan 5
+#define buzz 6
+#define button_1 7
+#define button_2 8
+#define button_3 10
+
+float nhiet_do, gas, state_led, state_fan, state_phoi=0;
+int pos = 0, data_send = 0, data_receive = 0;
+Servo myservo;
+
+void setup() {
+  // put your setup code here, to run once:
+  pinMode(CBGAS, INPUT);
+  pinMode(CBND, INPUT);
+  pinMode(led_bep, OUTPUT);
+  pinMode(fan, OUTPUT);
+  pinMode(buzz, OUTPUT);
+  pinMode(button_1, INPUT_PULLUP);
+  pinMode(button_2, INPUT_PULLUP);
+  pinMode(button_3, INPUT_PULLUP);
+  digitalWrite(led_bep, LOW);
+  digitalWrite(fan, HIGH);
+  digitalWrite(buzz, LOW);
+  myservo.attach(4);
+  Serial.begin(9600);
+}
+
+void loop() {
+  // Nhan du lieu tu Webserver
+  if(Serial.available()) {
+    while(Serial.available() < 2);
+    byte b1 = Serial.read();
+    byte b2 = Serial.read();
+    data_receive = b1*256 + b2;
+    
+    switch(data_receive) {
+      case 0: // tat den
+        digitalWrite(led_bep, 0);
+        state_led = 0;
+        break;
+       case 1: // bat den
+        digitalWrite(led_bep, 1);
+        state_led = 1;
+        break;
+       case 2: // tat quat
+        digitalWrite(fan, 1); // kich relay muc cao la TAT
+        state_fan = 0;
+        break;
+       case 3: // bat quat
+        digitalWrite(fan, 0); // kich relay muc thao la BAT
+        state_fan = 1;
+        break; 
+    }
+  }
+  // bat den
+  if(digitalRead(button_1)==0) // nut bat/tat den
+  { 
+    while (digitalRead(button_1)==0);
+    state_led=!state_led;
+    digitalWrite(led_bep,state_led);
+    if(state_led == 1) {
+      data_send = 1;
+      Serial.write(data_send/256);
+      Serial.write(data_send%256);
+    }
+    else {
+      data_send = 0;
+      Serial.write(data_send/256);
+      Serial.write(data_send%256);      
+    }
+   }
+  // bat quat thong gio
+  if(digitalRead(button_2) == 0)
+  { 
+    while (digitalRead(button_2) == 0);
+    state_fan=!state_fan;  
+    if(state_fan == 1) {
+      digitalWrite(fan, 0);
+      data_send = 3;
+      Serial.write(data_send/256);
+      Serial.write(data_send%256);
+    }
+    else {
+      digitalWrite(fan, 1);
+      data_send = 2;
+      Serial.write(data_send/256);
+      Serial.write(data_send%256);      
+    }
+    
+   }
+//canh bao khi co khi gas
+  nhiet_do=((5.0*100.0*analogRead(CBND))/1024.0);
+  gas=((5.0*100.0*analogRead(CBGAS))/1024.0);
+   //Serial.println(gas);
+   //Serial.println(nhiet_do);
+   //Serial.println(digitalRead(CBMUA));
+  if(((gas > 50)||(nhiet_do > 70)))
+  {  
+    digitalWrite(fan,LOW);
+    digitalWrite(buzz,HIGH);
+    delay(50);
+  }
+  else
+  {  
+     digitalWrite(buzz,LOW);
+     delay(50);
+  }
+ //day phoi quan ao khi troi mua
+ // che do tu dong bang cam bien
+  myservo.write(pos); 
+  if(state_phoi == 0) {
+    if ((digitalRead(CBMUA) == 1)&&(pos == 0)) // ko co mua
+    {
+          for(pos = 0; pos < 180; pos += 1)  // cho servo quay từ 0->179 độ
+          {                                  // mỗi bước của vòng lặp tăng 1 độ
+            myservo.write(pos);              // xuất tọa độ ra cho servo
+            delay(15);                       // đợi 15 ms cho servo quay đến góc đó rồi tới bước tiếp theo
+          } 
+   }
+   if((digitalRead(CBMUA) == 0)&&(pos == 180)) // co mua
+   {
+     for(pos = 180; pos>=1; pos-=1)     // cho servo quay từ 179-->0 độ
+            {                                
+               myservo.write(pos);              // xuất tọa độ ra cho servo
+               delay(15);                       // đợi 15 ms cho servo quay đến góc đó rồi tới bước tiếp theo
+            } 
+   }
+  }
+     //keo day phoi bang nut nhan
+   if(digitalRead(button_3)==0)
+    { 
+      while (digitalRead(button_3)==0);
+      if (pos==0)
+    {
+        for(pos = 0; pos < 180; pos += 1)  // cho servo quay từ 0->179 độ
+        {                                  // mỗi bước của vòng lặp tăng 1 độ
+          myservo.write(pos);              // xuất tọa độ ra cho servo
+          delay(15);                       // đợi 15 ms cho servo quay đến góc đó rồi tới bước tiếp theo
+        } 
+        state_phoi = 0;
+ }
+ 
+    else
+     {
+       for(pos = 180; pos>=1; pos-=1)     // cho servo quay từ 179-->0 độ
+              {                                
+                 myservo.write(pos);              // xuất tọa độ ra cho servo
+                 delay(15);                       // đợi 15 ms cho servo quay đến góc đó rồi tới bước tiếp theo
+              } 
+              state_phoi = 1;
+     }
+  }
+} 
+ 
